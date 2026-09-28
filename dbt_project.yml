@@ -1,23 +1,30 @@
 name: 'the_tuva_project_demo'
 version: '0.1.9'
 config-version: 2
-
 profile: default
-
 vars:
-
   claims_enabled: true
-  clinical_enabled: true
+  clinical_enabled: false
   provider_attribution_enabled: true
 
-  ## CMS HCC data mart vars
-  # Setting the payment year to year needed for the demo data
+  ccsr_enabled: true
+  cms_chronic_conditions_enabled: false
+  tuva_chronic_conditions_enabled: false
+  cms_hcc_enabled: false
+  hcc_recapture_enabled: false
+  hcc_suspecting_enabled: false
+  ed_classification_enabled: false
+  financial_pmpm_enabled: false
+  insights_enabled: false
+  quality_measures_enabled: false
+  readmissions_enabled: true
+
+  ## Turned off - was generating 300+ materialized DQI test tables
+  enable_input_layer_testing: false
+  enable_legacy_data_quality: false
+
   cms_hcc_payment_year: 2018
-
-  ## Quality Measure data mart vars
-  # Setting the reporting period to date needed for demo data
   quality_measures_period_end: "2018-12-31"
-
 model-paths: ["models"]
 analysis-paths: ["analyses"]
 test-paths: ["tests"]
@@ -28,13 +35,35 @@ target-path: "target"
 clean-targets:
   - "target"
   - "dbt_packages"
-
 models:
   the_tuva_project:
     input_layer:
       input_layer__provider_attribution:
         +enabled: false
-
+    data_quality:
+      dqi:
+        mart_review:
+          +enabled: false
+    claims_preprocessing:
+      +materialized: view
+      encounters:
+        ## Keep this whole subtree as real tables (the package's own
+        ## default), overriding the broader claims_preprocessing view
+        ## default above. We tried ephemeral + a materialized "boundary
+        ## layer" here to cut the ~88-table footprint, but it made things
+        ## worse: anchor_events/start_end_dates involve window functions
+        ## and date-range-overlap joins that are expensive to plan and
+        ## execute inline -- confirmed on local DuckDB, where a single
+        ## boundary-layer model (fan-out=1, so ephemeral bought nothing)
+        ## ran for 18+ minutes single-threaded and was eventually killed
+        ## by the OS for memory exhaustion. Views/ephemeral aren't
+        ## pre-computed by either Spark or DuckDB, so neither helps here.
+        ## The metastore's 500-table quota only counts tables (confirmed
+        ## from the actual QUOTA_EXCEEDED error text), and we have ~163
+        ## tables of headroom, so there's no need to avoid materializing
+        ## this folder -- the schema split in generate_schema_name.sql
+        ## handles the original per-schema 100-table cap on its own.
+        +materialized: table
 seeds:
   the_tuva_project_demo:
     appointment:

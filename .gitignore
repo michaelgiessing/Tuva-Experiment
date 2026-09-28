@@ -6,3 +6,5 @@ logs/
 .DS_Store
 dbt_packages/
 package-lock.yml
+notebooks/tuva_demo.duckdb
+notebooks/.ipynb_checkpoints/
